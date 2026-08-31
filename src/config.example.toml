@@ -1,0 +1,160 @@
+# voice-journal 配置模板
+# ════════════════════════════════════════════════════════════
+# 使用步骤:
+#   1. 把这个文件复制为 config.toml(同目录)
+#   2. 把所有 <YOUR_XXX> 占位改成你自己的实际值
+#   3. config.toml 已在 .gitignore 里,不会上传
+# ════════════════════════════════════════════════════════════
+
+[paths]
+# 使用 __AUTO__ 时，数据默认保存在当前用户的 LocalAppData/VoiceJournal/Data。
+# 也可以改成你自己的绝对路径，例如 "D:\\voice-journal-data"。
+root = "__AUTO__"
+
+
+[audio]
+# 主麦克风设备关键字(大小写不敏感,任一关键字匹配上就用)
+# DJI Mic 2 接收器在 Windows 上显示为 "Wireless Microphone RX"
+# 你可以在系统声音设置里看到自己的麦克风名,把关键字写进来
+device_name_keywords = ["wireless microphone rx", "wireless mic rx", "dji mic"]
+
+# 备用设备优先级列表(主设备找不到时按顺序尝试)
+# 每项是设备名包含的关键字
+# 留空数组 [] 表示主设备断开后直接等待,不切备用
+fallback_devices = ["Realtek"]
+
+sample_rate = 16000
+channels = 1
+
+# WebRTC VAD 模式: 0(松) - 3(严)。2 = 中等
+vad_mode = 2
+# 静音多久切一段(毫秒)
+silence_split_ms = 800
+# 单段最长(秒),超过强制切
+max_segment_sec = 60
+# 一段最小长度(秒),低于此长度不写盘(过滤短噪音)
+min_segment_sec = 1.5
+
+
+[transcriber]
+# funasr 模型(首次启动会自动下载,中文优化)
+asr_model = "iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
+vad_model = "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch"
+punc_model = "iic/punc_ct-transformer_cn-en-common-vocab471067-large"
+batch_size_s = 300
+# (可选)装了 funasr 的 python 路径。funasr/torch 太重,常装在系统 python 而非 .venv。
+# 留空则自动探测(C:\Program Files\Python3xx)。抖音视频转写会用它跑子进程。
+python = ""
+
+
+[speaker]
+# 用于区分“本人”和“他人”的声纹名称。建立自己的声纹时请使用同一个名字。
+owner_name = "我"
+# 声纹模型(CAM++,中文,26MB,首次启动自动下载)
+sv_model = "iic/speech_campplus_sv_zh-cn_16k-common"
+# 余弦相似度阈值:超过算同一人,低于算不确定/不同人
+match_threshold = 0.55
+# 超短段(<这个秒数)不抽声纹,标 unknown
+min_segment_for_sv = 2.0
+# 当日聚类阈值(不同人之间允许的最大相似度,通常比 match_threshold 略高)
+cluster_threshold = 0.50
+
+
+[summary]
+# 大模型 provider: deepseek | anthropic | openai
+# 推荐 deepseek:中文好 + 便宜 + 用 OpenAI SDK 兼容
+provider = "deepseek"
+
+# 不同 provider 的模型 ID
+model_deepseek = "deepseek-v4-flash"
+model_anthropic = "claude-sonnet-4-6"
+model_openai = "gpt-4o"
+
+# DeepSeek 官方 API base
+base_url_deepseek = "https://api.deepseek.com"
+
+# 触发时间(本地时区,24h),启动器读这个做兜底
+# 比如 "23:30" = 每晚 23:30 自动跑当日总结(如果还没跑过)
+trigger_hm = "23:30"
+
+# 阶段小结触发钟点(24h 本地时区):到这些整点各跑一次,简报每天固定钟点更新到当天
+# (取代旧的"按运行时长每 N 小时"——那样跨天会让简报日期落后一天)
+mini_clock_hours = [9, 12, 15, 18, 21]
+# (旧)按启动器运行时长的间隔,已不再使用,保留仅作兼容
+mini_interval_hours = 3
+
+# 一次总结失败重试次数
+retry = 3
+# 启动软件时不自动补跑历史 AI 任务，避免一次启动触发多天模型费用。
+startup_ai_backfill = false
+
+
+[obsidian]
+# Obsidian vault 根目录 — 绝对路径。留空时使用声年自己的本地笔记目录。
+# 比如 "D:\\MyVault" 或 "/Users/yourname/Documents/MyVault"
+# 第二大脑/会议纪要/输入档案 等所有 Wiki 内容都会写到这下面的「第二大脑/」子目录
+vault = "<YOUR_OBSIDIAN_VAULT_ABSOLUTE_PATH>"
+
+# vault 内的子文件夹名称(自动创建)
+folder = "语音日记"
+
+
+[lark]
+# (可选)飞书集成 — 不用飞书可以全留空
+# 多维表 base 的 app_token(创建表后从 URL 拿)和表名
+base_app_token = ""
+base_table_name = "语音日记"
+# 飞书云文档父目录 token(可空,空则放在我的空间根目录)
+docs_parent_token = ""
+
+
+[meeting]
+# 本地会议纪要目录(相对 ROOT,自动创建)
+local_dir = "meetings"
+# Obsidian 内的子目录(在 [obsidian].vault/第二大脑/ 下面)
+obsidian_subdir = "会议纪要"
+# 等飞书 AI 处理的最长时间(秒)
+wait_timeout = 300
+# 轮询飞书 AI 产物的间隔(秒)
+poll_interval = 15
+# 上传到飞书云空间的目标父目录 token(空=我的空间根目录)
+drive_parent_token = ""
+
+
+[content]
+# ── 内容生产用哪个模型 ──
+# 可选 provider:
+#   deepseek  = DeepSeek 官方(便宜稳,开箱即用,只需 DEEPSEEK_API_KEY)— 默认推荐
+#   gpt       = OpenAI 兼容中转的 GPT 系(中文创作强、遵循禁用词/标点好);需配 gpt_base_url/gpt_model
+#   anthropic = Claude(走 ANTHROPIC_BASE_URL;注意有的中转是 coding 套壳,只会写代码不会创作)
+# 选题雷达(JSON 提取)和创作工坊(口播稿/长文)可分别配。
+provider = "deepseek"
+radar_provider = "deepseek"
+studio_provider = "deepseek"
+# 若改用 gpt provider:OpenAI 兼容中转地址 + 模型名(key 复用 ANTHROPIC_API_KEY 环境变量)
+gpt_base_url = "https://your-openai-relay.example.com/v1"
+gpt_model = "gpt-5.5"
+# 内容工坊生成公众号长文/质检时等待更久；选题雷达仍使用代码里的短超时。
+studio_timeout_sec = 600
+# 公众号跨周聚合主题的回溯天数
+aggregate_lookback_days = 7
+# 成品输出子目录(在 vault/第二大脑/ 下面)
+output_subdir = "内容产出"
+
+
+[ai]
+# 开源版只使用用户自己的 API，不经过声年账号、计费或 Token 网关。
+mode = "direct_deepseek"
+
+
+[ingest]
+# 安全默认：不读取或解密浏览器登录态。商业构建会强制保持关闭。
+# 仅个人开发环境确有需要时，才手动改为 true，并自行承担账号与隐私风险。
+allow_browser_cookie_access = false
+use_rookiepy = false
+cookies_browsers = []
+# 可选：用户主动导出的 cookies.txt 绝对路径；商业 V1 不提供此功能。
+cookies_file = ""
+# 抖音下载器(DouyinAPIClient + abogus 签名)路径。yt-dlp 抓不了抖音,需配这个 + pip install rookiepy。
+# 指向一个含 core/api_client.py 的抖音 web API 下载器目录。没有则抖音抓取不可用(B站/公众号不受影响)。
+douyin_downloader_path = ""

@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.test-data/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# 本机配置和密钥
+.env
+.env.*
+src/config.toml
+config.toml
+*.key
+*.pem
+secrets.json
+start-launcher.bat
+
+# 用户私密数据
+raw/
+transcripts/
+notes/
+meetings/
+runtime/
+logs/
+release/
+hotwords.txt
+speakers.json
+voiceprints.npz
+corrections.json
+*cookies*.txt
+*cookies*.json
+
+# 大模型和本地素材
+models/
+.cache/
+assets-heavy/
+*.onnx
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.flac
+assets/backgrounds/custom-bg.png
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.bak
+*.log
