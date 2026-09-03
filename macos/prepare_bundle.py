@@ -22,7 +22,6 @@ def main():
     if sys.platform != "darwin":
         raise SystemExit("Run on the Mac builder")
     from modelscope import snapshot_download
-    import imageio_ffmpeg
     BUILD_RESOURCES.mkdir(parents=True, exist_ok=True)
     defaults = BUILD_RESOURCES / "defaults"
     defaults.mkdir(exist_ok=True)
@@ -39,8 +38,8 @@ def main():
     tools = BUILD_RESOURCES / "tools"
     tools.mkdir(exist_ok=True)
     ffmpeg = tools / "ffmpeg"
-    shutil.copy2(imageio_ffmpeg.get_ffmpeg_exe(), ffmpeg)
-    ffmpeg.chmod(0o755)
+    if not ffmpeg.is_file():
+        raise RuntimeError("Run macos/build_ffmpeg.py first")
     version = subprocess.run([str(ffmpeg), "-version"], capture_output=True, text=True, check=True).stdout
     (license_dir / "ffmpeg-build.txt").write_text(version, encoding="utf-8")
     # Include installed distributions' license files and a version manifest.

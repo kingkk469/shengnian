@@ -3,9 +3,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 [[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 ]]
 python -m pip install --no-cache-dir -r macos/requirements-resolved.txt
-python -m pip install --no-cache-dir pyinstaller==6.22.2 imageio-ffmpeg==0.6.0 pytest
+python -m pip install --no-cache-dir pyinstaller==6.22.2 pytest
 python -m pip check
 python -m pytest -q
+python macos/build_ffmpeg.py
 python macos/prepare_bundle.py
 python -m PyInstaller --noconfirm --clean macos/shengnian.spec
 app="$PWD/dist/声年.app"

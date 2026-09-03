@@ -11,10 +11,10 @@
 
 录音测试仅使用模型仓库自带的公开示例音频。用户的真实录音、声纹、笔记和 API Key 不进入构建环境。
 
-FFmpeg 以独立进程解码音频，通过 imageio-ffmpeg 提供的 macOS arm64 预编译文件分发；构建参数保存在 `licenses/dependencies/ffmpeg-build.txt`。FFmpeg 的许可证依实际构建配置而定，不等同于 imageio-ffmpeg Python 包的 BSD 许可证。
+FFmpeg 9.0.1 以独立进程解码音频，从 FFmpeg 官方源码为 macOS arm64 编译，禁用 GPL、nonfree 及第三方自动检测。对应源码压缩包、构建脚本和 LGPL 许可证随应用保存在 `licenses/dependencies/ffmpeg`，可使用同样的源码和脚本重新编译。
 
 - FFmpeg 上游源代码与许可证：https://ffmpeg.org/download.html
-- 二进制构建脚本和源码入口：https://github.com/imageio/imageio-ffmpeg/tree/main/binaries
+- 二进制构建脚本：声年源码中的 `macos/build_ffmpeg.py`
 - FFmpeg 许可证说明：https://ffmpeg.org/legal.html
 - Qt/PySide6 源码：https://code.qt.io/cgit/pyside/pyside-setup.git/
 

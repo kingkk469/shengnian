@@ -2,33 +2,13 @@
 from __future__ import annotations
 
 import getpass
-import json
-import os
 from pathlib import Path
 import sys
-import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 
-def save_key(path: Path, name: str, value: str) -> None:
-    if name not in {"DEEPSEEK_API_KEY", "SNAPANY_API_KEY"}:
-        raise ValueError("不支持的 API 类型")
-    payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    if not isinstance(payload, dict):
-        raise ValueError("已有 API 配置格式异常，请先检查原文件；未覆盖")
-    payload[name] = value.strip()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_name = tempfile.mkstemp(prefix=".api-keys-", suffix=".json", dir=path.parent)
-    temp_path = Path(temp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2)
-            handle.write("\n")
-        temp_path.chmod(0o600)
-        temp_path.replace(path)
-    finally:
-        temp_path.unlink(missing_ok=True)
+from api_settings import save_key
 
 
 def main():
