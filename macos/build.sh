@@ -22,4 +22,15 @@ ditto "$app" "dist/dmg-source/声年.app"
 ln -s /Applications dist/dmg-source/Applications
 cp macos/INSTALL.txt dist/dmg-source/安装说明.txt
 hdiutil create -volname "声年" -srcfolder dist/dmg-source -format UDZO -ov release/shengnian-macos-arm64.dmg
+hdiutil verify release/shengnian-macos-arm64.dmg
+mountpoint="$PWD/.test-data/dmg-mount"
+mkdir -p "$mountpoint"
+hdiutil attach -readonly -nobrowse -mountpoint "$mountpoint" release/shengnian-macos-arm64.dmg
+trap 'hdiutil detach "$mountpoint"' EXIT
+test -x "$mountpoint/声年.app/Contents/MacOS/Shengnian"
+test -f "$mountpoint/安装说明.txt"
+test "$(readlink "$mountpoint/Applications")" = /Applications
+codesign --verify --deep --strict --verbose=2 "$mountpoint/声年.app"
+hdiutil detach "$mountpoint"
+trap - EXIT
 shasum -a 256 release/shengnian-macos-arm64.dmg > release/shengnian-macos-arm64.dmg.sha256
