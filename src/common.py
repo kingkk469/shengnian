@@ -298,7 +298,7 @@ def undo_recent(minutes: int, delete_wav: bool = True) -> tuple[int, int]:
             if ts >= cutoff:
                 total_seg += 1
                 if delete_wav and r.get("wav"):
-                    wav = ROOT / r["wav"].replace("/", "\\")
+                    wav = ROOT / r["wav"].replace("\\", "/")
                     try:
                         if wav.exists():
                             wav.unlink()
@@ -321,7 +321,7 @@ def delete_segments(day: date, indexes: list[int], delete_wav: bool) -> tuple[in
     for i, r in enumerate(records):
         if i in drop_set:
             if delete_wav and r.get("wav"):
-                wav = ROOT / r["wav"].replace("/", "\\")
+                wav = ROOT / r["wav"].replace("\\", "/")
                 try:
                     if wav.exists():
                         wav.unlink()

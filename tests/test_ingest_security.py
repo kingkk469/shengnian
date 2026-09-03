@@ -69,6 +69,7 @@ class IngestSecurityTests(unittest.TestCase):
             with (
                 patch.object(sys, "frozen", True, create=True),
                 patch.dict(sys.modules, {"transcriber": bundled}),
+                patch("audio_import._ffmpeg_executable", return_value="bundled-ffmpeg"),
                 patch.object(ingest_url.subprocess, "run", side_effect=fake_ffmpeg),
             ):
                 self.assertEqual(

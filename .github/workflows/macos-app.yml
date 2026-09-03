@@ -22,8 +22,20 @@ jobs:
         with:
           python-version: '3.12'
           architecture: arm64
-      - name: Build and verify standalone app
-        run: bash macos/build.sh
+      - name: Install Python runtime dependencies
+        run: bash macos/build.sh dependencies
+      - name: Run regression tests on Mac
+        run: bash macos/build.sh test
+      - name: Compile bundled audio decoder
+        run: bash macos/build.sh decoder
+      - name: Prepare local speech models
+        run: bash macos/build.sh resources
+      - name: Build standalone application
+        run: bash macos/build.sh package
+      - name: Verify packaged app and model inference
+        run: bash macos/build.sh verify
+      - name: Create and verify DMG
+        run: bash macos/build.sh dmg
       - name: Upload standalone installer
         uses: actions/upload-artifact@v4
         with:

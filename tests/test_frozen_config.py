@@ -20,7 +20,7 @@ from pathlib import Path
 sys.frozen = True
 sys._MEIPASS = sys.argv[1]
 import common
-assert common.ROOT == Path(sys.argv[2])
+assert common.ROOT == Path(sys.argv[2]).resolve()
 assert (common.ROOT / 'config.toml').is_file()
 assert (common.ROOT / 'hotwords.txt').read_text(encoding='utf-8') == '声年'
 assert not (Path(sys._MEIPASS) / 'config.toml').exists()

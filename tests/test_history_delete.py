@@ -92,7 +92,8 @@ class _FakeMessageBox:
         pass
 
 
-def test_delete_segments_removes_text_and_corresponding_wav(tmp_path, monkeypatch):
+@pytest.mark.parametrize("separator", ["/", "\\"])
+def test_delete_segments_removes_text_and_corresponding_wav(tmp_path, monkeypatch, separator):
     monkeypatch.setattr(common, "ROOT", tmp_path)
     day = dt.date(2026, 7, 28)
     raw_dir = tmp_path / "raw" / day.isoformat()
@@ -103,7 +104,7 @@ def test_delete_segments_removes_text_and_corresponding_wav(tmp_path, monkeypatc
     delete_wav.write_bytes(b"delete")
     records = [
         {"text": "保留", "wav": f"raw/{day.isoformat()}/keep.wav"},
-        {"text": "删除", "wav": f"raw/{day.isoformat()}/delete.wav"},
+        {"text": "删除", "wav": separator.join(["raw", day.isoformat(), "delete.wav"])},
     ]
     common.write_jsonl(common.transcript_path(day), records)
 

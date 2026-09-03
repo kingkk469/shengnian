@@ -14,9 +14,9 @@
 
 用户已明确授权向现有仓库推送独立构建分支并运行 Mac 构建。适配代码已推送至 `kingkk469/shengnian` 的 `codex/macos-app-20260903` 分支，未修改主分支。
 
-当前阻塞：已连接 GitHub 应用在创建 `.github/workflows/macos-app.yml` 时返回 HTTP 403 `Resource not accessible by integration`。GitHub CLI 已登录仓库管理员账号，但 OAuth 凭证未包含 `workflow` scope。启动官方 `gh auth refresh --hostname github.com --scopes workflow` 授权流程被自动审批拒绝，理由是新增 scope 会扩大账户持久访问权限，现有的推送和构建授权尚不覆盖凭证权限升级。需要用户明确同意新增这一项权限，并完成 GitHub 官方授权流程；没有尝试绕过拒绝。
+用户已单独授权增加 GitHub CLI 的 `workflow` scope，并已在 GitHub 官方网页完成确认。权限已验证生效，工作流已随提交 `4ede70a` 推送到独立分支。
 
-工作流文件目前仅在本地，尚未启动远程 Mac 构建，尚未产出独立 `.app` 或 `.dmg`。本地检查为 80 项通过、2 项 POSIX 文件锁检查待 Mac 执行。无需用户提供 Mac 参与自动化测试。
+首轮 Mac 构建已启动：[GitHub Actions 33758128929](https://github.com/kingkk469/shengnian/actions/runs/33758128929)。等待实际构建及冻结应用自检结果，尚未产出经验证的独立 `.app` 或 `.dmg`。本地检查为 80 项通过、2 项 POSIX 文件锁检查待 Mac 执行。无需用户提供 Mac 参与自动化测试。
 
 仓库未配置 Apple 开发者签名和公证凭证。构建脚本可先产生临时签名的应用；这不等于 Apple 公证，安装说明已区分。
 
