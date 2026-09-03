@@ -30,7 +30,7 @@ def run(*args: str | Path, capture: bool = False) -> str:
     return result.stdout if capture else ""
 
 
-def api(path: str) -> dict:
+def api(path: str) -> dict | list:
     return json.loads(run("gh", "api", f"repos/{REPO}/{path}", capture=True))
 
 
@@ -149,11 +149,30 @@ def publish() -> None:
         "--notes-file", RECORD / "release-notes.md")
     for name in manifest:
         run("gh", "release", "upload", TAG, OUT / name, "--repo", REPO)
-    draft = api(f"releases/tags/{TAG}")
+    finalize()
+
+
+def finalize() -> None:
+    """Finish an uploaded draft using the independently saved verification manifest."""
+    manifest = json.loads((RECORD / "asset-manifest.json").read_text(encoding="utf-8"))
+    verification = json.loads((RECORD / "release-verification.json").read_text(encoding="utf-8"))
+    require(verification["status"] == "passed" and verification["build_sha"] == BUILD_SHA,
+            "Missing successful native verification of this build")
+    # GitHub does not expose an unpublished draft through releases/tags/<tag>.
+    candidates = [item for item in api("releases?per_page=100") if item["tag_name"] == TAG]
+    require(len(candidates) == 1, "Expected exactly one draft for this tag")
+    draft = api(f"releases/{candidates[0]['id']}")
     require(draft["draft"] and draft["prerelease"], "Unexpected release state before publication")
     check_assets(draft, manifest)
     require(draft["target_commitish"] == BUILD_SHA, "Draft targets unexpected source")
+    require(draft["body"].strip() == (RECORD / "release-notes.md").read_text(encoding="utf-8").strip(),
+            "Draft notes do not match this verified release")
     run("gh", "release", "edit", TAG, "--repo", REPO, "--draft=false")
+    verify_public()
+
+
+def verify_public() -> None:
+    manifest = json.loads((RECORD / "asset-manifest.json").read_text(encoding="utf-8"))
     published = api(f"releases/tags/{TAG}")
     require(not published["draft"] and published["prerelease"], "Release was not published")
     require(published["body"].strip() == (RECORD / "release-notes.md").read_text(encoding="utf-8").strip(),
@@ -167,4 +186,5 @@ def publish() -> None:
 
 if __name__ == "__main__":
     os.chdir(ROOT)
-    {"prepare": prepare, "publish": publish}[sys.argv[1]]()
+    {"prepare": prepare, "publish": publish, "finalize": finalize,
+     "verify-public": verify_public}[sys.argv[1]]()
