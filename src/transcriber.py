@@ -1,12 +1,11 @@
 """funasr Paraformer-zh 转写常驻服务。
 
-- 启动加载模型 → 常驻 GPU
+- 启动加载模型 → 常驻内存（Mac 测试版默认 CPU）
 - watchdog 监听 raw/ 目录的新 .wav
 - 转写后 append 一行到 transcripts/YYYY-MM-DD.jsonl
 - 失败不阻塞后续段(写 error 字段)
 
-注意:本脚本需要用系统 Python 3.12 跑(funasr/torch/modelscope 已装在那),
-不要用 uv venv。启动方式见 install-autostart.ps1。
+使用安装了 FunASR/torch 的 Python 3.12 环境运行。Mac 安装方式见 macos/README.md。
 """
 from __future__ import annotations
 
@@ -21,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+from platform_support import RoleLock, install_worker_signals, model_device_kwargs
 
 from common import (
     CONFIG,
@@ -104,6 +104,7 @@ def get_model():
             vad_model=vad_model,
             punc_model=punc_model,
             disable_update=True,
+            **model_device_kwargs(cfg),
         )
         log.info("ASR 模型加载完成")
     return _model
@@ -117,7 +118,8 @@ def get_sv_model():
         speaker_model = _model_path("speaker", CONFIG["speaker"]["sv_model"])
         if Path(speaker_model).is_absolute():
             log.info("使用安装包内置声纹模型: %s", speaker_model)
-        _sv_model = AutoModel(model=speaker_model, disable_update=True)
+        _sv_model = AutoModel(model=speaker_model, disable_update=True,
+                             **model_device_kwargs(CONFIG["transcriber"]))
         log.info("声纹模型加载完成")
     return _sv_model
 
@@ -451,7 +453,7 @@ def scan_pending() -> None:
         log.info("启动扫描: 无遗漏 WAV，全部已转写")
 
 
-def main() -> None:
+def _run() -> None:
     log.info("transcriber 启动")
     # 预热模型(避免第一段说话才开始下载/加载)
     try:
@@ -473,6 +475,20 @@ def main() -> None:
     finally:
         obs.stop()
         obs.join()
+
+
+def main() -> None:
+    lock = RoleLock(ROOT, "transcriber")
+    if not lock.acquire():
+        log.info("已有 transcriber 实例在运行，本次启动直接退出")
+        return
+    install_worker_signals()
+    try:
+        _run()
+    except KeyboardInterrupt:
+        log.info("转写服务已停止")
+    finally:
+        lock.release()
 
 
 if __name__ == "__main__":

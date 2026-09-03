@@ -25,6 +25,7 @@ import sounddevice as sd
 import webrtcvad
 
 from common import CONFIG, ROOT, day_dir, iso_now, pause_flag, setup_logger, write_recorder_status
+from platform_support import RoleLock, install_worker_signals, microphone_permission_hint, prevent_macos_sleep
 
 
 # Windows ES_* 标志,告诉系统"我在工作请别休眠"
@@ -34,6 +35,12 @@ ES_AWAYMODE_REQUIRED = 0x00000040
 
 
 def prevent_sleep(on: bool) -> None:
+    if sys.platform == "darwin":
+        try:
+            prevent_macos_sleep(on)
+        except OSError as exc:
+            log.warning("无法设置录音防休眠: %s", exc)
+        return
     if sys.platform != "win32":
         return
     try:
@@ -197,7 +204,7 @@ def find_device(excluded_indices: set[int] | None = None) -> tuple[int, str, boo
         if selected:
             return selected[0], selected[1], False
 
-    # 3. 首次启动没有设备关键字时，使用 Windows 默认输入设备。
+    # 3. 使用系统默认输入设备（包括 Mac 内置麦克风）。
     default_candidates = [(i, d) for i, d in input_devs if i == default_input]
     selected = _first_supported(default_candidates, excluded_indices)
     if selected:
@@ -492,6 +499,9 @@ def run_once(device_index: int, device_name: str, duration: int | None = None) -
             # ── 设备健康检查（每 2 秒）──
             if now - last_device_check >= 2:
                 last_device_check = now
+                if sys.platform == "darwin" and now - (state["last_frame_at"] or started) > 8:
+                    flush()
+                    raise RuntimeError("录音流长时间未收到数据，重新连接麦克风")
                 if not _device_still_present(device_name):
                     flush()
                     raise RuntimeError(
@@ -569,7 +579,7 @@ def meter_mode(seconds: int) -> None:
     log.info("调试模式结束")
 
 
-def main() -> None:
+def _run() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--list-devices", action="store_true", help="列出所有输入设备并退出")
     parser.add_argument("--meter", type=int, metavar="SEC",
@@ -615,7 +625,7 @@ def main() -> None:
             _write_state(
                 "waiting_device",
                 has_device=False,
-                error="没有找到可用麦克风，请检查 Windows 麦克风权限和输入设备；程序会自动尝试其他接口",
+                error="没有找到可用麦克风。" + microphone_permission_hint(),
                 user_error="没有找到可用麦克风，请检查系统权限或点击“麦克风”切换",
                 retry_in_sec=no_device_backoff,
             )
@@ -659,6 +669,25 @@ def main() -> None:
             )
             _last_was_primary = None   # 重置状态,下次重新检测
             time.sleep(reconnect_backoff)
+
+
+def main() -> None:
+    # Listing devices does not own the recorder; every recording mode does.
+    if "--list-devices" in sys.argv:
+        _run()
+        return
+    lock = RoleLock(ROOT, "recorder")
+    if not lock.acquire():
+        log.info("已有 recorder 实例在运行，本次启动直接退出")
+        return
+    install_worker_signals()
+    try:
+        _run()
+    except KeyboardInterrupt:
+        log.info("录音服务已停止")
+    finally:
+        prevent_sleep(False)
+        lock.release()
 
 
 if __name__ == "__main__":

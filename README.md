@@ -1,12 +1,14 @@
 # 声年
 
-声年是一个本地优先的 Windows AI 语音知识库：持续录音、本地中文转写，再用你自己的 AI API 生成总结、待办、会议纪要和知识卡片。
+声年是一个本地优先的 AI 语音知识库：持续录音、本地中文转写，再用你自己的 AI API 生成总结、待办、会议纪要和知识卡片。Windows 版已有验证；苹果芯片 Mac 的源码测试版已加入，仍需 Mac 实机验收。
+
+**Mac 用户从 [Mac 测试版安装说明](macos/README.md) 开始。** 当前交付为源码测试版，尚无经 Mac 验证、签名和公证的 `.app` / `.dmg` 安装包。
 
 这个仓库是免费开源版：没有声年账号、邀请码、激活、套餐、购买、退款或产品 Token 网关。你需要自行申请并承担 AI API 服务商产生的费用。
 
 ## 核心能力
 
-- 任意 Windows 麦克风常驻录音，自动静音切片
+- 麦克风常驻录音，自动静音切片（Mac 麦克风权限和稳定性待实机验证）
 - FunASR 本地中文转写，原始音频不发送给声年服务器
 - 用户自有 DeepSeek API 生成每日总结、复盘、待办和卡片
 - 本地历史管理、声纹识别、会议纪要和可选 Obsidian 输出
@@ -85,7 +87,7 @@ VoiceJournal/Data/
 └── logs/             运行日志
 ```
 
-这些目录以及 API Key、Cookie、本机配置均不会被 Git 跟踪。不要在 Issue 中上传真实录音、转写或日志原文。
+这些目录以及 API Key、Cookie、本机配置均不会被 Git 跟踪。Mac 配置向导将自有 API Key 保存在数据目录的 `runtime/api-keys.json`，权限为仅当前用户可读写；显式设置的环境变量优先。不要在 Issue 中上传真实录音、转写、凭证文件或日志原文。
 
 ## 常用命令
 
@@ -106,6 +108,7 @@ VoiceJournal/Data/
 ## 已知限制
 
 - 当前只正式验证 Windows 和 Python 3.12。
+- Mac 源码测试版以苹果芯片、macOS 14+、Python 3.12 为首轮测试目标；默认 CPU 转写，尚未确认 MPS 加速、持续录音和声纹模型的实机表现。
 - 第一次下载 FunASR 模型可能较慢。
 - 公开平台链接抓取会受平台页面变化影响；默认不读取浏览器 Cookie。
 - AI 输出可能出错，涉及决策、发布或对外材料时请人工核对。
@@ -118,6 +121,8 @@ VoiceJournal/Data/
 ```
 
 贡献前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 和 [SECURITY.md](SECURITY.md)。
+
+跨平台改造与本轮验证记录见 [Mac 适配验证记录](macos/VALIDATION.md)。
 
 ## 开源协议
 

@@ -157,17 +157,25 @@ def _ffmpeg_executable() -> str | None:
         return configured
     candidates: list[Path] = []
     frozen_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    binary = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
     candidates.extend(
         [
-            frozen_root / "tools" / "ffmpeg.exe",
-            frozen_root / "ffmpeg.exe",
-            Path(sys.executable).resolve().parent / "tools" / "ffmpeg.exe",
+            frozen_root / "tools" / binary,
+            frozen_root / binary,
+            Path(sys.executable).resolve().parent / "tools" / binary,
         ]
     )
     for candidate in candidates:
         if candidate.exists():
             return str(candidate)
-    return shutil.which("ffmpeg")
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    if sys.platform == "darwin":
+        for candidate in (Path("/opt/homebrew/bin/ffmpeg"), Path("/usr/local/bin/ffmpeg")):
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                return str(candidate)
+    return None
 
 
 def _probe_with_ffmpeg(path: Path) -> tuple[dt.datetime | None, float]:

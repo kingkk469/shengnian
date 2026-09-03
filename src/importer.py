@@ -29,6 +29,9 @@ log = setup_logger("importer")
 
 def find_dji_drive() -> list[Path]:
     """扫所有盘符,返回含 DJI_AUDIO 目录的盘符列表。"""
+    if sys.platform == "darwin":
+        volumes = Path("/Volumes")
+        return sorted(d for d in volumes.iterdir() if (d / "DJI_AUDIO").is_dir()) if volumes.is_dir() else []
     hits = []
     for letter in string.ascii_uppercase:
         d = Path(f"{letter}:\\")
@@ -65,7 +68,7 @@ def import_wavs(drive: Path, dry_run: bool = False) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("drive", nargs="?", default=None, help="盘符根目录,如 E:\\")
+    parser.add_argument("drive", nargs="?", default=None, help="挂载目录,如 E:\\ 或 /Volumes/DJI")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -74,7 +77,7 @@ def main() -> None:
     else:
         drives = find_dji_drive()
         if not drives:
-            log.error("未找到含 DJI_AUDIO 的盘符。请指定:python importer.py E:\\")
+            log.error("未找到含 DJI_AUDIO 的设备。请用 python importer.py 指定设备挂载目录")
             sys.exit(1)
         log.info("自动检测到 DJI 盘符: %s", [str(d) for d in drives])
 

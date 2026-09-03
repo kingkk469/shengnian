@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import subprocess
 import webbrowser
 from pathlib import Path
 from urllib.parse import quote
@@ -44,6 +45,8 @@ def build_open_uri(path: Path) -> str:
 
 
 def _obsidian_config_path() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "obsidian" / "obsidian.json"
     appdata = os.environ.get("APPDATA", "").strip()
     if appdata:
         return Path(appdata) / "obsidian" / "obsidian.json"
@@ -81,6 +84,10 @@ def vault_is_registered(notes_root: Path, config_path: Path | None = None) -> bo
 
 def obsidian_uri_registered() -> bool:
     """Return whether Windows knows how to handle ``obsidian://`` links."""
+    if sys.platform == "darwin":
+        return any(path.is_dir() for path in (
+            Path("/Applications/Obsidian.app"), Path.home() / "Applications/Obsidian.app",
+        ))
     if sys.platform != "win32":
         return False
     try:
@@ -107,8 +114,10 @@ def launch_uri(uri: str) -> bool:
         if sys.platform == "win32":
             os.startfile(uri)  # type: ignore[attr-defined]
             return True
+        if sys.platform == "darwin":
+            return subprocess.run(["/usr/bin/open", uri], timeout=10).returncode == 0
         return bool(webbrowser.open(uri))
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return False
 
 

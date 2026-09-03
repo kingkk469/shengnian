@@ -623,10 +623,16 @@ def _run_yt_dlp(args: list[str], timeout: int = 300) -> tuple[int, str, str]:
     """执行 yt-dlp，返回 (returncode, stdout, stderr)。
     抖音等平台报缺 cookies 时,自动按浏览器顺序加 --cookies-from-browser 重试。"""
     # 优先用 venv 里装的，回退到 PATH
-    yt = shutil_which_yt_dlp()
+    yt_command = ([sys.executable, "--role", "yt-dlp"] if getattr(sys, "frozen", False)
+                  else [shutil_which_yt_dlp()])
 
     def _exec(extra: list[str]) -> tuple[int, str, str]:
-        cmd = [yt] + extra + args
+        cmd = yt_command + extra + args
+        if getattr(sys, "frozen", False):
+            from audio_import import _ffmpeg_executable
+            bundled_ffmpeg = _ffmpeg_executable()
+            if bundled_ffmpeg:
+                cmd += ["--ffmpeg-location", str(Path(bundled_ffmpeg).parent)]
         log.info("[yt-dlp] %s", " ".join(extra + args))
         try:
             r = subprocess.run(
@@ -686,7 +692,10 @@ def shutil_which_yt_dlp() -> str:
     """yt-dlp 可执行路径。"""
     import shutil
     # 优先 venv
-    venv_yt = ROOT / ".venv" / "Scripts" / "yt-dlp.exe"
+    from common import RESOURCE_ROOT
+    venv_yt = RESOURCE_ROOT / ".venv" / (
+        "Scripts/yt-dlp.exe" if sys.platform == "win32" else "bin/yt-dlp"
+    )
     if venv_yt.exists():
         return str(venv_yt)
     found = shutil.which("yt-dlp") or shutil.which("yt-dlp.exe")
@@ -1033,6 +1042,10 @@ def _funasr_python() -> str:
     cfg_py = (CONFIG.get("transcriber", {}).get("python") or "").strip()
     if cfg_py and Path(cfg_py).exists():
         return cfg_py
+    if sys.platform != "win32":
+        from common import RESOURCE_ROOT
+        from platform_support import source_python
+        return str(source_python(RESOURCE_ROOT))
     for cand in (r"C:\Program Files\Python312\python.exe",
                  r"C:\Program Files\Python311\python.exe",
                  r"C:\Program Files\Python310\python.exe"):
@@ -1046,8 +1059,12 @@ def _transcribe_douyin_video(video_path: str) -> list[dict]:
     funasr 装在系统 python(不在 launcher 的 .venv),所以走子进程跑转写,
     用 <<<DOUYIN_TEXT>>> 标记分隔,避开 funasr 加载时打印的一堆日志。"""
     wav_path = str(Path(video_path).with_suffix(".wav"))
+    from audio_import import _ffmpeg_executable
+    ffmpeg = _ffmpeg_executable()
+    if not ffmpeg:
+        raise RuntimeError("未找到音频解码组件 FFmpeg")
     subprocess.run(
-        ["ffmpeg", "-y", "-i", video_path, "-vn", "-ar", "16000",
+        [ffmpeg, "-y", "-i", video_path, "-vn", "-ar", "16000",
          "-ac", "1", "-acodec", "pcm_s16le", wav_path],
         capture_output=True, check=True, creationflags=_NO_WINDOW,
     )

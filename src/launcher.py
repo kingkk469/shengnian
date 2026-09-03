@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import subprocess
+import signal
 import sys
 import threading
 import time
@@ -38,6 +39,10 @@ from common import (
     read_jsonl, read_recorder_status, save_speakers, transcript_path,
 )
 from runtime_profile import feature_enabled, is_commercial_mode
+from platform_support import (
+    RoleLock, configure_qt_environment, locked_role_pid, microphone_permission_hint,
+    open_path, pid_exists, source_python,
+)
 import runtime_profile as _runtime_profile
 from brief_presenter import render_today_brief, render_yesterday_review
 from brief_sources import (
@@ -56,8 +61,7 @@ from todo_capture import plan_today_tasks
 
 # ROOT 是用户数据目录，源码运行环境始终位于 RESOURCE_ROOT。
 # 两者在数据迁移到其他磁盘后不再相同，不能再从 ROOT 拼虚拟环境路径。
-VENV_PY = RESOURCE_ROOT / ".venv" / "Scripts" / "python.exe"
-VENV_PYW = RESOURCE_ROOT / ".venv" / "Scripts" / "pythonw.exe"
+VENV_PY = source_python(RESOURCE_ROOT)
 SRC = RESOURCE_ROOT / "src"
 MOMENTS_ASSET_DIR = RESOURCE_ROOT / "prompts" / "moments-workflow"
 _moments_workflow_override = os.environ.get(
@@ -145,7 +149,7 @@ def _decode_moments_output(raw: bytes) -> str:
 # ============================================================
 QSS = """
 * {
-    font-family: "Inter", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei";
+    font-family: "Inter", "PingFang SC", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei";
     font-size: 15px;
     font-weight: 500;
     outline: none;
@@ -1326,7 +1330,8 @@ class ProcessHandle:
         """查找当前角色对应的 Windows 进程，兼容源码脚本与冻结安装版。"""
         found: list[int] = []
         if sys.platform != "win32":
-            return found
+            pid = locked_role_pid(ROOT, self.name)
+            return [pid] if pid else []
         try:
             import subprocess as _sp
 
@@ -1358,6 +1363,8 @@ class ProcessHandle:
 
     def _kill_stale(self) -> None:
         """杀掉同角色的孤儿进程，但跳过当前已在管理的 PID。"""
+        if sys.platform != "win32":
+            return  # POSIX workers use a persistent advisory lock.
         my_pid = self.proc.pid if (self.proc and self.proc.poll() is None) else None
         try:
             import subprocess as _sp
@@ -1383,18 +1390,9 @@ class ProcessHandle:
         return False
 
     def _pid_exists(self, pid: int) -> bool:
-        """检查 PID 是否仍然存在（用 os.kill(pid, 0) 原生检测，不调外部命令）。"""
-        try:
-            import ctypes
-            handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-            if handle == 0:
-                return False
-            exit_code = ctypes.c_ulong(0)
-            ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
-            ctypes.windll.kernel32.CloseHandle(handle)
-            return exit_code.value == 259  # STILL_ACTIVE = 259
-        except Exception:
-            return False
+        if sys.platform != "win32":
+            return locked_role_pid(ROOT, self.name) == pid
+        return pid_exists(pid)
 
     def is_running(self) -> bool:
         # 优先检查 Popen 句柄
@@ -1459,14 +1457,21 @@ class ProcessHandle:
                 self.proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.proc.kill()
+                self.proc.wait(timeout=5)
         elif adopted_pid and self._pid_exists(adopted_pid):
             try:
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(adopted_pid)],
-                    capture_output=True,
-                    timeout=5,
-                    creationflags=NO_WINDOW,
-                )
+                if sys.platform == "win32":
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(adopted_pid)],
+                        capture_output=True, timeout=5, creationflags=NO_WINDOW,
+                    )
+                else:
+                    os.kill(adopted_pid, signal.SIGTERM)
+                    deadline = time.monotonic() + 5
+                    while self._pid_exists(adopted_pid) and time.monotonic() < deadline:
+                        time.sleep(0.1)
+                    if self._pid_exists(adopted_pid):
+                        os.kill(adopted_pid, signal.SIGKILL)
             except Exception:
                 pass
         if hasattr(self, "_log") and self._log:
@@ -1503,11 +1508,16 @@ class Launcher(QMainWindow):
     def __init__(self):
         super().__init__()
         title = f"声年｜你的 AI 语音知识库 · 开源版 {APP_VERSION}"
+        if sys.platform == "darwin":
+            title += " · Mac 测试版 1"
         self.setWindowTitle(title)
         self.setAcceptDrops(True)
         # 默认尺寸：贴合大多数 16:9 屏幕，留 60px 边距
         self.resize(1900, 920)
         self.setMinimumSize(1100, 620)
+        if sys.platform == "darwin" and self.screen():
+            area = self.screen().availableGeometry()
+            self.resize(min(1440, int(area.width() * 0.92)), min(920, int(area.height() * 0.88)))
         self._aspect_ratio = 1900 / 920   # 锁定的宽高比
         self._resizing_internal = False   # 防止 resize 事件递归
         self._font_scale = load_font_scale(ROOT)
@@ -3227,7 +3237,7 @@ class Launcher(QMainWindow):
         source = resolve_yesterday_brief(ROOT)
         if source.has_output:
             import os
-            os.startfile(str(source.output_path))
+            open_path(str(source.output_path))
         else:
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(
@@ -3586,9 +3596,9 @@ class Launcher(QMainWindow):
         if not p.exists():
             p = note_path(dt.date.today())
         if p.exists():
-            os.startfile(str(p))
+            open_path(str(p))
         else:
-            os.startfile(str(ROOT / "notes"))
+            open_path(str(ROOT / "notes"))
             QMessageBox.information(self, "还没有今日总结", "已打开笔记文件夹。运行一次“立即总结今天”后，这里会生成 Markdown 文件。")
 
     def _open_todo_md(self):
@@ -3597,11 +3607,11 @@ class Launcher(QMainWindow):
         if not p.exists():
             today = dt.date.today().isoformat()
             p.write_text(f"# 待办总览\n> 最后更新：{today}\n## 待完成\n## 本周已完成\n", encoding="utf-8")
-        os.startfile(str(p))
+        open_path(str(p))
 
     def _open_wiki(self):
         """用系统默认程序打开第二大脑文件夹。"""
-        os.startfile(str(knowledge_dir()))
+        open_path(str(knowledge_dir()))
 
     def _build_topbar(self) -> QFrame:
         bar = QFrame()
@@ -3751,6 +3761,9 @@ class Launcher(QMainWindow):
 
     def _on_account(self):
         """显示用户自有 API 的配置状态。"""
+        if sys.platform == "darwin":
+            from api_settings import show_api_dialog
+            return show_api_dialog(self, ROOT)
         from ai_gateway import provider_api_key
 
         configured = bool(provider_api_key("DEEPSEEK_API_KEY").strip())
@@ -3823,7 +3836,7 @@ class Launcher(QMainWindow):
             return
         if target is not None:
             if target.exists():
-                os.startfile(str(target))
+                open_path(str(target))
             else:
                 QMessageBox.warning(self, "许可证材料缺失", f"找不到文件：\n{target}")
 
@@ -5158,7 +5171,7 @@ class Launcher(QMainWindow):
                     f"当前候选还没有最终品牌图。\n\n生成后应保存到：\n{expected_path}",
                 )
                 return
-            os.startfile(str(image_path))
+            open_path(str(image_path))
             self.bottom_status.setText(f"已打开对应配图 · {c['title'][:24]}")
 
         copy_body_btn.clicked.connect(lambda: copy_text("body"))
@@ -5188,7 +5201,7 @@ class Launcher(QMainWindow):
 
         open_btn = QPushButton("打开 Markdown")
         open_btn.setToolTip("用默认编辑器打开这次生成的预览文件")
-        open_btn.clicked.connect(lambda: os.startfile(str(preview_path)))
+        open_btn.clicked.connect(lambda: open_path(str(preview_path)))
         row.addWidget(open_btn)
 
         close_btn = QPushButton("关闭")
@@ -5210,6 +5223,25 @@ class Launcher(QMainWindow):
             self._recorder_was_started = True
 
     def _start_all(self):
+        if sys.platform == "darwin" and getattr(sys, "frozen", False):
+            from PySide6.QtCore import QMicrophonePermission
+            app = QApplication.instance()
+            permission = QMicrophonePermission()
+            status = app.checkPermission(permission)
+            if status == Qt.PermissionStatus.Undetermined:
+                if not getattr(self, "_microphone_request_pending", False):
+                    self._microphone_request_pending = True
+                    def permission_result(result):
+                        self._microphone_request_pending = False
+                        if result.status() == Qt.PermissionStatus.Granted:
+                            self._start_all()
+                        else:
+                            self.bottom_status.setText(microphone_permission_hint())
+                    app.requestPermission(permission, self, permission_result)
+                return
+            if status != Qt.PermissionStatus.Granted:
+                QMessageBox.information(self, "麦克风权限", microphone_permission_hint())
+                return
         # 标记:用户主动开了录音 — 后续守护检查到 recorder 死了会自动重启
         self._recorder_was_started = True
         # 用户主动点「启动录音」= 想录 → 顺手清掉可能残留的自动暂停标记
@@ -5430,7 +5462,7 @@ class Launcher(QMainWindow):
         if not p.exists():
             QMessageBox.information(self, "提示", f"今天还没有总结。\n路径:{p}")
             return
-        os.startfile(str(p))
+        open_path(str(p))
 
     def _open_history(self):
         HistoryWindow(self).show()
@@ -5615,7 +5647,7 @@ class Launcher(QMainWindow):
             self.signal_label.setToolTip(
                 f"{raw_reason}\n\n"
                 "程序正在自动尝试其他采样率和音频接口。"
-                "如仍失败，请点击“麦克风”切换设备，并检查 Windows 麦克风权限。"
+                "如仍失败，请点击“麦克风”切换设备。" + microphone_permission_hint()
             )
             self.rec_value.setText("自动重试中")
             self.dev_value.setText(status.get("device_name") or "—")
@@ -6133,7 +6165,7 @@ class HistoryWindow(QDialog):
         rl.addWidget(self.table, 1)
 
         bottom = QHBoxLayout()
-        self.bottom_label = QLabel("提示 · Ctrl/Shift 多选 · 删除选中")
+        self.bottom_label = QLabel("提示 · Cmd/Shift 多选 · 删除选中" if sys.platform == "darwin" else "提示 · Ctrl/Shift 多选 · 删除选中")
         self.bottom_label.setStyleSheet("color:#3a3833; font-size:13px;")
         bottom.addWidget(self.bottom_label, 1)
         btn_edit_jsonl = QPushButton("编辑 jsonl")
@@ -6192,7 +6224,7 @@ class HistoryWindow(QDialog):
                 self.table.setItem(i, col, item)
         chars = sum(len(r.get("text") or "") for r in records)
         self.head_label.setText(f"{day.isoformat()}   ·  共 {len(records)} 段 / {chars} 字")
-        self.bottom_label.setText("提示 · Ctrl/Shift 多选 · 删除选中")
+        self.bottom_label.setText("提示 · Cmd/Shift 多选 · 删除选中" if sys.platform == "darwin" else "提示 · Ctrl/Shift 多选 · 删除选中")
 
     def _reload_current(self):
         if self.current_day:
@@ -6301,7 +6333,7 @@ class HistoryWindow(QDialog):
             return
         p = transcript_path(self.current_day)
         if p.exists():
-            os.startfile(str(p))
+            open_path(str(p))
 
     def _open_day_md(self):
         if not self.current_day:
@@ -6310,7 +6342,7 @@ class HistoryWindow(QDialog):
         if not p.exists():
             QMessageBox.information(self, "提示", f"该日没有总结 MD\n路径:{p}")
             return
-        os.startfile(str(p))
+        open_path(str(p))
 
     def _right_click(self, pos):
         row = self.table.rowAt(pos.y())
@@ -6364,7 +6396,7 @@ class HistoryWindow(QDialog):
             )
             return
         try:
-            os.startfile(str(p))   # Windows 默认关联
+            open_path(str(p))   # Windows 默认关联
         except Exception as e:
             QMessageBox.warning(self, "播放失败", str(e))
 
@@ -7034,7 +7066,7 @@ class MeetingExportDialog(QDialog):
         self.progress_lbl.setText(f"✓ 完成：{Path(path).name}")
         # 自动打开 MD
         try:
-            os.startfile(path)
+            open_path(path)
         except Exception:
             pass
         QMessageBox.information(
@@ -8800,6 +8832,9 @@ def _dispatch_internal_role() -> bool:
                 str(RESOURCE_ROOT / "config.commercial.toml"),
             )
         runpy.run_path(str(MOMENTS_SCRIPT), run_name="__main__")
+    elif role == "yt-dlp":
+        import yt_dlp
+        yt_dlp.main(sys.argv[1:])
     elif role == "package-smoke":
         from runtime_profile import (
             automatic_browser_cookie_access_enabled,
@@ -8889,7 +8924,7 @@ def main():
     _os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
     _os.environ.setdefault("QT_SCALE_FACTOR_ROUNDING_POLICY", "PassThrough")
     # 关键：用 FreeType 取代 DirectWrite 渲染中文（解决 Qt6 + ClearType 双重抗锯齿导致中文糊的问题）
-    _os.environ.setdefault("QT_QPA_PLATFORM", "windows:fontengine=freetype")
+    configure_qt_environment()
 
     from PySide6.QtCore import Qt
     QApplication.setHighDpiScaleFactorRoundingPolicy(
@@ -8897,19 +8932,26 @@ def main():
     )
 
     app = QApplication(sys.argv)
+    app.setApplicationName("声年")
+    app.setOrganizationName("King")
+    launcher_lock = RoleLock(ROOT, "launcher")
+    if not launcher_lock.acquire():
+        QMessageBox.information(None, "声年", "声年已经在运行，请打开已有窗口。")
+        return
+    app.aboutToQuit.connect(launcher_lock.release)
 
     # ── 字体：Segoe UI（英文）+ Microsoft YaHei UI（中文，ClearType 优化版）──
     # 雅黑 UI 是微软专门给 Windows 8+ 做的 hint 优化版，跟 ClearType 完美配合
     from PySide6.QtGui import QFontDatabase, QFont
     families = set(QFontDatabase.families())
     # 优先 Inter（Claude 网页同款），中文 fallback 到雅黑 UI
-    primary = "Inter" if "Inter" in families else "Segoe UI"
+    primary = "Inter" if "Inter" in families else app.font().family()
     startup_font_scale = load_font_scale(ROOT)
     base_font = QFont(primary, max(8, round(11 * startup_font_scale)))
     fallback = [primary]
     if primary == "Inter" and "Segoe UI" in families:
         fallback.append("Segoe UI")
-    for fam in ("Microsoft YaHei UI", "Microsoft YaHei"):
+    for fam in ("PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei"):
         if fam in families:
             fallback.append(fam)
     base_font.setFamilies(fallback)

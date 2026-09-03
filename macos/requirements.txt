@@ -1,0 +1,7 @@
+# Source beta: native Apple Silicon Python 3.12, macOS 14+ test target.
+-r ../requirements.txt
+PySide6>=6.6,<6.12
+torch>=2.2,<3
+torchaudio>=2.2,<3
+numpy>=1.26,<3
+soundfile>=0.12

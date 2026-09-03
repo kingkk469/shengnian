@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Iterator
 
 from runtime_profile import is_commercial_mode
+from platform_support import default_data_root, load_local_api_keys
 
 
 _HERE = Path(__file__).resolve().parent
@@ -29,6 +30,17 @@ RESOURCE_ROOT = _FROZEN_ROOT if getattr(sys, "frozen", False) else _HERE.parent
 def load_config() -> dict:
     config_name = "config.commercial.toml" if is_commercial_mode() else "config.toml"
     config_path = _FROZEN_ROOT / config_name if getattr(sys, "frozen", False) else _HERE / config_name
+    override = os.environ.get("VOICE_JOURNAL_CONFIG", "").strip()
+    if getattr(sys, "frozen", False) and not is_commercial_mode() and not override:
+        local_config = default_data_root() / "config.toml"
+        if not local_config.exists():
+            local_config.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(_FROZEN_ROOT / "config.example.toml", local_config)
+        config_path = local_config
+    if override and not is_commercial_mode():
+        # An explicit missing file is an error, never a silent fallback.
+        with Path(override).expanduser().open("rb") as handle:
+            return tomllib.load(handle)
     if not config_path.exists() and not is_commercial_mode():
         config_path = _HERE / "config.example.toml"
     with open(config_path, "rb") as f:
@@ -37,22 +49,18 @@ def load_config() -> dict:
 
 CONFIG = load_config()
 _configured_root = str(CONFIG["paths"].get("root", "")).strip()
-if is_commercial_mode() or _configured_root in {"", "__AUTO__"}:
-    _local_appdata = Path(
-        os.environ.get("VOICE_JOURNAL_LOCAL_APPDATA")
-        or os.environ.get("LOCALAPPDATA")
-        or (Path.home() / "AppData" / "Local")
-    )
-    ROOT = Path(os.environ.get("VOICE_JOURNAL_DATA_ROOT") or (_local_appdata / "VoiceJournal" / "Data"))
+if is_commercial_mode() or os.environ.get("VOICE_JOURNAL_DATA_ROOT", "").strip() or _configured_root in {"", "__AUTO__"}:
+    ROOT = default_data_root()
 else:
     ROOT = Path(_configured_root)
 ROOT = ROOT.expanduser().resolve()
+load_local_api_keys(ROOT)
 
 
 def _ensure_data_layout() -> None:
     for name in ("raw", "transcripts", "notes", "logs", "runtime", "meetings"):
         (ROOT / name).mkdir(parents=True, exist_ok=True)
-    if not is_commercial_mode():
+    if not is_commercial_mode() and not getattr(sys, "frozen", False):
         return
     defaults = RESOURCE_ROOT / "defaults"
     if not defaults.exists():

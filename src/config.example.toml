@@ -7,7 +7,8 @@
 # ════════════════════════════════════════════════════════════
 
 [paths]
-# 使用 __AUTO__ 时，数据默认保存在当前用户的 LocalAppData/VoiceJournal/Data。
+# 使用 __AUTO__ 时：Windows 为 LocalAppData/VoiceJournal/Data；
+# macOS 为 ~/Library/Application Support/VoiceJournal/Data。
 # 也可以改成你自己的绝对路径，例如 "D:\\voice-journal-data"。
 root = "__AUTO__"
 
@@ -20,7 +21,7 @@ device_name_keywords = ["wireless microphone rx", "wireless mic rx", "dji mic"]
 
 # 备用设备优先级列表(主设备找不到时按顺序尝试)
 # 每项是设备名包含的关键字
-# 留空数组 [] 表示主设备断开后直接等待,不切备用
+# 列表未命中时尝试系统默认麦克风（Mac 内置麦克风也适用）
 fallback_devices = ["Realtek"]
 
 sample_rate = 16000
@@ -37,13 +38,16 @@ min_segment_sec = 1.5
 
 
 [transcriber]
+# auto：Mac 测试版使用 CPU；Windows 保留 FunASR 默认设备选择。
+# 只有完成对应硬件实测后才手动改为 mps/cuda。
+device = "auto"
 # funasr 模型(首次启动会自动下载,中文优化)
 asr_model = "iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
 vad_model = "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch"
 punc_model = "iic/punc_ct-transformer_cn-en-common-vocab471067-large"
 batch_size_s = 300
 # (可选)装了 funasr 的 python 路径。funasr/torch 太重,常装在系统 python 而非 .venv。
-# 留空则自动探测(C:\Program Files\Python3xx)。抖音视频转写会用它跑子进程。
+# 留空：Mac 使用项目虚拟环境；Windows 保留常见系统 Python 探测。
 python = ""
 
 
@@ -93,7 +97,7 @@ startup_ai_backfill = false
 # Obsidian vault 根目录 — 绝对路径。留空时使用声年自己的本地笔记目录。
 # 比如 "D:\\MyVault" 或 "/Users/yourname/Documents/MyVault"
 # 第二大脑/会议纪要/输入档案 等所有 Wiki 内容都会写到这下面的「第二大脑/」子目录
-vault = "<YOUR_OBSIDIAN_VAULT_ABSOLUTE_PATH>"
+vault = ""
 
 # vault 内的子文件夹名称(自动创建)
 folder = "语音日记"

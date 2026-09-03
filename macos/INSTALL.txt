@@ -1,0 +1,15 @@
+声年 Mac 独立运行版（苹果芯片，macOS 14+）
+
+1. 打开 DMG，把“声年”拖到 Applications（应用程序）。
+2. 从应用程序中打开声年，无需安装 Python、Homebrew 或语音模型。
+3. 点击“API”填写自己的 DeepSeek API Key；本地录音和转写不需要 API Key。
+4. 点击开始录音，按系统提示允许声年访问麦克风。
+
+本版未完成 Apple 开发者公证。如 macOS 阻止首次打开，请在系统设置 → 隐私与安全性中按系统提示确认打开；不要关闭系统的全局安全保护。
+
+录音、笔记、转写、API 配置保存在：
+~/Library/Application Support/VoiceJournal/Data
+
+内置 Python、运行库、FFmpeg 和本地语音模型。AI 总结需要联网并使用你自己的 API，音频与本地转写不上传声年服务器。
+
+实际麦克风硬件、合盖睡眠和设备热插拔仍受用户 Mac 的硬件和系统设置影响。
