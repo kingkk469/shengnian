@@ -2,13 +2,13 @@
 
 独立应用面向苹果芯片 Mac（M1 或更新芯片），要求 macOS 14 或更新版本。Intel Mac 暂不支持。
 
-当前正在 GitHub 的苹果芯片 Mac 环境构建和验证。是否已完成、实际安装包及测试结果以 [构建状态](BUILD_STATUS.md) 为准；源码 ZIP 不能代替独立安装包。
+独立应用已在 GitHub 的苹果芯片 Mac 环境构建成功，并通过实际转写、声纹和原生界面检查。[下载完整安装包](https://github.com/kingkk469/shengnian/actions/runs/33759616541/artifacts/9896177635)（约 2.45 GB，需登录 GitHub，2026-09-17 前下载保存）。详细结果见 [构建状态](BUILD_STATUS.md)。
 
 ## 安装独立应用
 
-构建通过后提供 `shengnian-macos-arm64.dmg`，包含 Python、运行库、FFmpeg、中文语音识别、语音活动检测、标点和声纹模型，无需另行安装 Python、Homebrew 或模型。
+下载的 ZIP 内有 `shengnian-macos-arm64.dmg` 及校验文件。DMG 包含 Python、运行库、FFmpeg、中文语音识别、语音活动检测、标点和声纹模型，无需另行安装 Python、Homebrew 或模型。
 
-1. 打开 DMG，把“声年”拖入“Applications（应用程序）”。
+1. 解压下载的 ZIP，打开 DMG，把“声年”拖入“Applications（应用程序）”。
 2. 从“应用程序”打开声年。
 3. 点击“API 配置”，填写自己的 DeepSeek API Key。录音和本地转写可以不填。
 4. 点击开始录音，按 macOS 提示允许声年访问麦克风。
