@@ -1,0 +1,46 @@
+name: Build macOS standalone app
+on:
+  push:
+    branches: ["codex/macos-app-*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: macos-app-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      PYTHONIOENCODING: utf-8
+      PIP_DISABLE_PIP_VERSION_CHECK: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - name: Build and verify standalone app
+        run: bash macos/build.sh
+      - name: Upload standalone installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: shengnian-macos-arm64
+          path: release/shengnian-macos-arm64.dmg*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build-evidence
+          path: |
+            .test-data/frozen-mac/runtime/mac-self-test-*.json
+            .test-data/frozen-mac/runtime/mac-app.png
+            .test-data/frozen-mac/logs/*.log
+            build/shengnian/warn-*.txt
+          include-hidden-files: true
+          retention-days: 14
