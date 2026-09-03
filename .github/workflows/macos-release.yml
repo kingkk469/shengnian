@@ -1,0 +1,60 @@
+name: Publish verified Mac installer
+on:
+  push:
+    branches: ["codex/macos-release-20260903"]
+    paths:
+      - .github/workflows/macos-release.yml
+      - macos/publish_release.py
+      - macos/RELEASE_NOTES.md
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: shengnian-macos-beta1-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - name: Download the already verified installer
+        uses: actions/download-artifact@v4
+        with:
+          name: shengnian-macos-arm64
+          run-id: 33759616541
+          github-token: ${{ github.token }}
+          path: release/cloud-source/installer
+      - name: Download original Mac verification evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-build-evidence
+          run-id: 33759616541
+          github-token: ${{ github.token }}
+          path: release/cloud-source/evidence
+      - name: Verify and segment the native disk image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python macos/publish_release.py prepare
+      - name: Upload assets, verify their hashes, and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python macos/publish_release.py publish
+      - name: Save publication evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release-evidence
+          path: |
+            release/publication/*.json
+            release/publication/*.md
+            release/publication/*.txt
+          if-no-files-found: warn
+          retention-days: 30
