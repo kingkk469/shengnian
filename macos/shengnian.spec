@@ -46,9 +46,9 @@ exe = EXE(
     target_arch="arm64", codesign_identity=identity,
     entitlements_file=str(ROOT / "macos/entitlements.plist"),
 )
-collection = COLLECT(exe, analysis.binaries, analysis.datas, name="Shengnian", strip=False, upx=False)
 app = BUNDLE(
-    collection, name="声年.app", bundle_identifier="com.king.shengnian",
+    exe, analysis.binaries, analysis.datas,
+    name="声年.app", bundle_identifier="com.king.shengnian",
     info_plist={
         "CFBundleName": "声年", "CFBundleDisplayName": "声年",
         "CFBundleShortVersionString": "0.3.1", "CFBundleVersion": "1",

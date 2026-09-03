@@ -22,14 +22,28 @@ jobs:
         with:
           python-version: '3.12'
           architecture: arm64
+      - name: Restore public model and decoder resources
+        id: bundle-resources
+        uses: actions/cache/restore@v4
+        with:
+          path: assets-heavy/macos-bundle
+          key: macos-arm64-resources-v1-${{ hashFiles('macos/build_ffmpeg.py', 'macos/prepare_bundle.py', 'macos/requirements-resolved.txt') }}
       - name: Install Python runtime dependencies
         run: bash macos/build.sh dependencies
       - name: Run regression tests on Mac
         run: bash macos/build.sh test
       - name: Compile bundled audio decoder
+        if: steps.bundle-resources.outputs.cache-hit != 'true'
         run: bash macos/build.sh decoder
       - name: Prepare local speech models
+        if: steps.bundle-resources.outputs.cache-hit != 'true'
         run: bash macos/build.sh resources
+      - name: Cache verified public resources
+        if: steps.bundle-resources.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: assets-heavy/macos-bundle
+          key: ${{ steps.bundle-resources.outputs.cache-primary-key }}
       - name: Build standalone application
         run: bash macos/build.sh package
       - name: Verify packaged app and model inference
