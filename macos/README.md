@@ -1,5 +1,7 @@
 # 声年 Mac 版
 
+2026-09-18：本地已加入录音中断修复候选，86 项回归通过；尚未生成新版安装包，旧 beta.1 不包含修改。详见 [录音修复记录](RECORDING_FIX_20260918.md)。
+
 独立应用面向苹果芯片 Mac（M1 或更新芯片），要求 macOS 14 或更新版本。Intel Mac 暂不支持。
 
 独立应用已在 GitHub 的苹果芯片 Mac 环境构建成功，并通过实际转写、声纹和原生界面检查。[从 GitHub Release 下载完整安装包](https://github.com/kingkk469/shengnian/releases/tag/v0.3.1-macos-beta.1)（两卷共约 2.40 GB，无需登录）。详细结果见 [构建状态](BUILD_STATUS.md)。

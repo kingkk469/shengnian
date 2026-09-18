@@ -13,6 +13,7 @@ import argparse
 import collections
 import datetime as dt
 import math
+import queue
 import struct
 import sys
 import time
@@ -82,7 +83,7 @@ def _write_state(state: str, **extra) -> None:
 
 
 def _candidate_sample_rates(device: dict | None = None) -> list[int]:
-    """按产品格式、设备原生格式和 Windows 常见格式生成候选采样率。"""
+    """Mac 优先原生采样率，避免 CoreAudio 在采集时转换设备格式。"""
     rates = [SR]
     if device:
         try:
@@ -90,7 +91,10 @@ def _candidate_sample_rates(device: dict | None = None) -> list[int]:
         except (TypeError, ValueError):
             native = 0
         if native > 0:
-            rates.append(native)
+            if sys.platform == "darwin":
+                rates.insert(0, native)
+            else:
+                rates.append(native)
     rates.extend((48000, 44100, 32000))
     return list(dict.fromkeys(rate for rate in rates if rate > 0))
 
@@ -125,6 +129,7 @@ def _device_supports_capture(device_index: int, device: dict | None = None) -> b
 def _first_supported(
     candidates: list[tuple[int, dict]],
     excluded_indices: set[int] | None = None,
+    probe_formats: bool = True,
 ) -> tuple[int, str] | None:
     excluded_indices = excluded_indices or set()
     seen: set[int] = set()
@@ -132,7 +137,7 @@ def _first_supported(
         if index in seen or index in excluded_indices:
             continue
         seen.add(index)
-        if _device_supports_capture(index, device):
+        if not probe_formats or _device_supports_capture(index, device):
             return index, str(device.get("name") or f"输入设备 {index}")
     return None
 
@@ -150,7 +155,7 @@ def _load_preferred() -> dict:
     return {"mode": "auto"}
 
 
-def find_device(excluded_indices: set[int] | None = None) -> tuple[int, str, bool] | None:
+def find_device(excluded_indices: set[int] | None = None, *, probe_formats: bool = True) -> tuple[int, str, bool] | None:
     """扫描可用输入设备，按优先级返回 (index, name, is_primary)。
 
     优先级：手动指定(若该设备在) > 主设备(DJI) > fallback_devices 顺序 > None
@@ -180,7 +185,7 @@ def find_device(excluded_indices: set[int] | None = None) -> tuple[int, str, boo
         manual = default_first([
             (i, d) for i, d in input_devs if d.get("name") == pref["name"]
         ])
-        selected = _first_supported(manual, excluded_indices)
+        selected = _first_supported(manual, excluded_indices, probe_formats)
         if selected:
             i, name = selected
             is_p = any(k in name.lower() for k in DEVICE_KW)
@@ -191,7 +196,7 @@ def find_device(excluded_indices: set[int] | None = None) -> tuple[int, str, boo
         (i, d) for i, d in input_devs
         if any(k in (d.get("name") or "").lower() for k in DEVICE_KW)
     ])
-    selected = _first_supported(primary, excluded_indices)
+    selected = _first_supported(primary, excluded_indices, probe_formats)
     if selected:
         return selected[0], selected[1], True
 
@@ -200,17 +205,17 @@ def find_device(excluded_indices: set[int] | None = None) -> tuple[int, str, boo
         fallback = default_first([
             (i, d) for i, d in input_devs if kw in (d.get("name") or "").lower()
         ])
-        selected = _first_supported(fallback, excluded_indices)
+        selected = _first_supported(fallback, excluded_indices, probe_formats)
         if selected:
             return selected[0], selected[1], False
 
     # 3. 使用系统默认输入设备（包括 Mac 内置麦克风）。
     default_candidates = [(i, d) for i, d in input_devs if i == default_input]
-    selected = _first_supported(default_candidates, excluded_indices)
+    selected = _first_supported(default_candidates, excluded_indices, probe_formats)
     if selected:
         return selected[0], selected[1], False
     if input_devs and not DEVICE_KW and not FALLBACK_KW:
-        selected = _first_supported(default_first(input_devs), excluded_indices)
+        selected = _first_supported(default_first(input_devs), excluded_indices, probe_formats)
         if selected:
             return selected[0], selected[1], False
 
@@ -389,6 +394,22 @@ def run_once(device_index: int, device_name: str, duration: int | None = None) -
         "voice_detected": False,
     }
     ring: collections.deque[bytes] = collections.deque(maxlen=10)  # pre-roll 200ms
+    # The real-time callback only copies audio. Disk I/O and VAD run on the
+    # session thread, which also owns flush(), so segment state cannot race.
+    pending = queue.Queue(maxsize=500)  # Up to ten seconds of 20 ms blocks.
+    callback_error = []
+    last_received = [time.monotonic()]
+
+    def callback(indata, frames, time_info, status, capture_sr):
+        try:
+            last_received[0] = time.monotonic()
+            pending.put_nowait((indata.copy(), frames, status, capture_sr))
+        except queue.Full:
+            if not callback_error:
+                callback_error.append("音频处理积压，录音缓冲已满")
+        except Exception as exc:
+            if not callback_error:
+                callback_error.append(str(exc))
 
     def flush() -> None:
         seg = state["seg"]
@@ -405,7 +426,7 @@ def run_once(device_index: int, device_name: str, duration: int | None = None) -
         state["silence"] = 0
         state["in_segment"] = False
 
-    def callback(indata, frames, time_info, status, capture_sr):
+    def process_audio(indata, frames, status, capture_sr):
         try:
             if status:
                 log.warning("sd status: %s", status)
@@ -454,8 +475,9 @@ def run_once(device_index: int, device_name: str, duration: int | None = None) -
                 if idle > 60:
                     log.info("过去 60s 未检测到语音 (静音 %.0fs)", idle)
         except Exception as e:
-            # callback 抛异常 sounddevice 会弹 Python-CFFI error 弹窗,这里吞掉记日志
-            log.exception("callback 异常: %s", e)
+            # Report processing failures to the reconnect loop, not a silent
+            # callback failure followed by a misleading recording heartbeat.
+            raise RuntimeError(f"音频处理失败: {e}") from e
 
     started = time.time()
     _write_state(
@@ -471,7 +493,16 @@ def run_once(device_index: int, device_name: str, duration: int | None = None) -
         last_heartbeat = 0.0
         last_device_check = time.time()
         while True:
-            sd.sleep(500)
+            try:
+                block = pending.get(timeout=0.1)
+            except queue.Empty:
+                block = None
+            if block is not None:
+                process_audio(*block)
+            if callback_error:
+                raise RuntimeError(callback_error[0])
+            if not stream.active:
+                raise RuntimeError("麦克风音频流已停止，重新连接")
             # 每秒心跳一次
             now = time.time()
             if now - last_heartbeat >= 1.0:
@@ -499,26 +530,23 @@ def run_once(device_index: int, device_name: str, duration: int | None = None) -
             # ── 设备健康检查（每 2 秒）──
             if now - last_device_check >= 2:
                 last_device_check = now
-                if sys.platform == "darwin" and now - (state["last_frame_at"] or started) > 8:
-                    flush()
+                if sys.platform == "darwin" and time.monotonic() - last_received[0] > 8:
                     raise RuntimeError("录音流长时间未收到数据，重新连接麦克风")
                 if not _device_still_present(device_name):
-                    flush()
                     raise RuntimeError(
                         f"设备 '{device_name}' 从系统消失（可能拔出/没电），切换"
                     )
-                _want = find_device()
+                # Enumerate preferences without probing/reconfiguring the
+                # running CoreAudio device at several sample rates.
+                _want = find_device(probe_formats=sys.platform != "darwin")
                 if _want and _want[1] != device_name:
-                    flush()
                     raise RuntimeError(f"切换目标麦: {_want[1]}")
 
             if duration is not None and now - started >= duration:
                 log.info("达到 --duration %ds,优雅退出并 flush", duration)
-                flush()
                 return
     except KeyboardInterrupt:
         log.info("收到 Ctrl+C,flush 当前段")
-        flush()
         raise
     finally:
         if stream is not None:
@@ -530,7 +558,19 @@ def run_once(device_index: int, device_name: str, duration: int | None = None) -
                 stream.close()
             except Exception:
                 pass
-        prevent_sleep(False)
+        try:
+            # Capture is stopped before draining: no concurrent segment writes.
+            while True:
+                try:
+                    block = pending.get_nowait()
+                except queue.Empty:
+                    break
+                process_audio(*block)
+        finally:
+            try:
+                flush()
+            finally:
+                prevent_sleep(False)
 
 
 def meter_mode(seconds: int) -> None:
