@@ -1,6 +1,6 @@
 [project]
 name = "voice-journal"
-version = "0.3.0"
+version = "0.3.2"
 description = "声年：本地优先的 AI 语音知识库"
 requires-python = ">=3.12"
 dependencies = [

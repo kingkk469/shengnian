@@ -1,0 +1,24 @@
+{
+  "name": "FFmpeg LGPL shared",
+  "version": "N-125829-gfe953596e9-20260728",
+  "license": "LGPL-3.0-or-later",
+  "variant": "win64-lgpl-shared",
+  "ffmpeg_commit": "fe953596e9",
+  "build_project": "https://github.com/BtbN/FFmpeg-Builds",
+  "binary_url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl-shared.zip",
+  "binary_archive_sha256": "204E9D61C62780855FCDD1A71DBDCD5AC0164011918F0CE028A6A789D8B53FBE",
+  "source_bundle": "VoiceJournal-FFmpeg-LGPL-Sources-20260728.zip",
+  "configuration_gate": {
+    "required": [
+      "--enable-shared",
+      "--disable-static",
+      "--disable-libx264",
+      "--disable-libx265",
+      "--disable-libxvid"
+    ],
+    "forbidden": [
+      "--enable-gpl",
+      "--enable-nonfree"
+    ]
+  }
+}

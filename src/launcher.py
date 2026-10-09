@@ -85,7 +85,7 @@ MOMENTS_STATUS_PATH = MOMENTS_WORKFLOW_DIR / "运行输出" / "朋友圈发布�
 MOMENTS_PUBLISH_RECORD_PATH = MOMENTS_WORKFLOW_DIR / "05-发布记录.md"
 # 子进程不弹控制台黑窗:launcher 是 pythonw(无窗口),子进程跑 python.exe 默认会闪黑框
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.3.2"
 
 
 def _role_command(role: str, *args: str) -> list[str]:
@@ -3760,22 +3760,9 @@ class Launcher(QMainWindow):
             QMessageBox.warning(self, "麦克风", f"打开设备列表失败:{e}")
 
     def _on_account(self):
-        """显示用户自有 API 的配置状态。"""
-        if sys.platform == "darwin":
-            from api_settings import show_api_dialog
-            return show_api_dialog(self, ROOT)
-        from ai_gateway import provider_api_key
-
-        configured = bool(provider_api_key("DEEPSEEK_API_KEY").strip())
-        message = (
-            "声年开源版不提供账号、收费、套餐或 Token 网关。\n\n"
-            "AI 文字从本机直接发送到你配置的 DeepSeek API；"
-            "录音和本地转写不会上传。\n\n"
-            + ("已检测到 DEEPSEEK_API_KEY。" if configured else
-               "尚未检测到 DEEPSEEK_API_KEY。请按 README 配置后重启声年。")
-        )
-        QMessageBox.information(self, "自有 API 配置", message)
-        return QDialog.DialogCode.Accepted
+        """在界面中保存用户自己的 API Key。"""
+        from api_settings import show_api_dialog
+        return show_api_dialog(self, ROOT)
 
     def _card_generation_gate(self, _card_id: str) -> bool:
         """在 GUI 线程检查用户自己的 API Key。"""
@@ -3796,9 +3783,14 @@ class Launcher(QMainWindow):
 
     def _on_files(self):
         """显示本地存储说明，并提供一键打开入口。"""
-        from onboarding import StorageGuideDialog
-
-        StorageGuideDialog(ROOT, self).exec()
+        box = QMessageBox(self)
+        box.setWindowTitle("本地文件")
+        box.setText(f"录音、转写、笔记和 API 配置保存在：\n{ROOT}")
+        button = box.addButton("打开数据目录", QMessageBox.ActionRole)
+        box.addButton("关闭", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is button:
+            open_path(ROOT)
 
     def _legal_dir(self) -> Path:
         """返回源码模式或冻结安装包中的许可证材料目录。"""
@@ -3818,7 +3810,7 @@ class Launcher(QMainWindow):
         box.setText(f"声年\n你的 AI 语音知识库\n说出来，自动整理\n版本 {APP_VERSION}")
         box.setInformativeText(
             "本软件包含依据 LGPL、MIT、Apache-2.0、BSD 等许可证提供的"
-            "第三方组件。声年自有业务代码保持闭源。"
+            "第三方组件。声年代码以 MIT 协议免费开源。"
         )
         license_button = box.addButton("开源许可证", QMessageBox.ActionRole)
         source_button = box.addButton("对应源码说明", QMessageBox.ActionRole)

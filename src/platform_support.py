@@ -61,12 +61,10 @@ def microphone_permission_hint() -> str:
 
 
 def load_local_api_keys(root: Path) -> None:
-    """Mac Finder/login launches do not inherit shell profile variables.
+    """Desktop launches load keys saved by the local configuration dialog.
 
 Read data, never execute shell config. Explicit environment values win.
 """
-    if sys.platform != "darwin":
-        return
     path = root / "runtime" / "api-keys.json"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))

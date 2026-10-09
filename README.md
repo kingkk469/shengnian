@@ -2,6 +2,8 @@
 
 声年是一个本地优先的 AI 语音知识库：持续录音、本地中文转写，再用你自己的 AI API 生成总结、待办、会议纪要和知识卡片。Windows 版已有验证；苹果芯片 Mac 独立应用已完成构建，并通过 Mac 自动化转写、声纹和原生界面检查。
 
+**Windows 用户：[下载独立免费版 0.3.2](https://github.com/kingkk469/shengnian/releases/tag/v0.3.2-windows)**。下载 `Shengnian-0.3.2-Windows-x64.exe` 并双击解压，打开解压后的“声年”文件夹，启动 `声年.exe`，点击“API 配置”填写自己的 DeepSeek Key。内置运行环境、离线模型和音频解码工具。详见 [Windows 说明](windows/README.md)。
+
 **Mac 用户：[下载独立安装包](https://github.com/kingkk469/shengnian/releases/tag/v0.3.1-macos-beta.1) · [安装说明](macos/README.md)。** 两个分卷下载到同一文件夹后，打开 `.dmg` 即可安装。包内包含运行时和模型，适用于苹果芯片、macOS 14+；尚未经过 Apple 公证，物理麦克风和长时间录音仍未做硬件验收。
 
 这个仓库是免费开源版：没有声年账号、邀请码、激活、套餐、购买、退款或产品 Token 网关。你需要自行申请并承担 AI API 服务商产生的费用。
