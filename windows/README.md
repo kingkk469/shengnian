@@ -1,6 +1,6 @@
 # 声年 Windows 免费版
 
-[GitHub 下载页](https://github.com/kingkk469/shengnian/releases/tag/v0.3.2-windows)：下载 `Shengnian-0.3.2-Windows-x64.exe`，双击并选择目录解压；再运行“声年”文件夹中的 `声年.exe`。无需另外安装解压软件。第三方对应源码作为发布页的独立附件提供。
+[GitHub 下载页](https://github.com/kingkk469/shengnian/releases/tag/v0.3.2-windows)：下载 `Shengnian-0.3.2-Windows-Setup.exe`，双击并点击“下载并安装”；安装器自动下载两个载荷、核对 SHA-256、合并解压并打开声年。无需手动下载分卷、安装 Python 或解压软件。安装时需联网下载约 2.24 GB，完成后录音与转写在本地运行。第三方对应源码作为发布页的独立附件提供。
 
 Windows 10/11 x64 的独立便携版，版本 0.3.2。内置 Python、CPU PyTorch、四个语音模型和 FFmpeg；解压整个 ZIP 后双击 `声年.exe`，在主界面“API 配置”填写自己的 DeepSeek Key。
 

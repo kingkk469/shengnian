@@ -4,10 +4,10 @@
 
 ## 下载与使用
 
-**普通用户只需下载 [Shengnian-0.3.2-Windows-x64.exe](https://github.com/kingkk469/shengnian/releases/download/v0.3.2-windows/Shengnian-0.3.2-Windows-x64.exe)。** 页面下方 GitHub 自动生成的 `Source code` 是开发源码，使用软件请下载上面的 EXE。
+**普通用户只需下载 [Shengnian-0.3.2-Windows-Setup.exe](https://github.com/kingkk469/shengnian/releases/download/v0.3.2-windows/Shengnian-0.3.2-Windows-Setup.exe)。** 页面下方 GitHub 自动生成的 `Source code` 是开发源码，使用软件请下载上面的安装器。
 
-1. 双击下载的 EXE，选择一个普通文件夹进行解压，无需另装解压软件。
-2. 打开解压后的“声年”文件夹，双击 `声年.exe`。保留整个文件夹，`_internal` 是程序必需的运行环境。
+1. 双击安装器，点击“下载并安装”。默认无需管理员权限，也可以选择保存目录。
+2. 安装器自动从 GitHub 下载约 2.24 GB 完整程序，校验并解压后打开声年。无需手动下载分卷、安装 Python 或解压软件。保留整个“声年”文件夹，`_internal` 是程序必需的运行环境。
 3. 点击主界面的“API 配置”，填写自己的 DeepSeek API Key 并保存。重启后自动读取；SnapAny Key 可选。
 4. 点击开始录音，或导入已有录音。本地录音、转写无需 API Key；AI 调用费用由你的服务商账户承担。
 
@@ -20,7 +20,7 @@
 - 87 项回归通过，2 项平台检查跳过。
 - 实际打包 EXE 的主界面、历史窗口、API 保存及新进程读取、压缩音频导入、公开示例离线转写和 192 维声纹推理通过。
 - 测试使用隔离数据目录、空模型缓存及公开示例，未上传真实录音或进行付费 API 调用。
-- 本次重新封装仅调整下载格式和源码获取说明，应用程序与模型保持已验证的版本；自解压附件通过完整性检查。
+- 本次重新封装仅调整下载方式和源码获取说明，应用程序与模型保持已验证的版本。安装器的分卷合并、SHA-256 校验和实际解压流程通过本地验证。
 - 程序未做代码签名，Windows 可能提示未知发布者。不同电脑的物理麦克风、热插拔和长时间录音仍需实机验证。
 
 ## 开源与对应源码
@@ -32,5 +32,7 @@
 - `VoiceJournal-FFmpeg-LGPL-Sources-20260728.zip`：FFmpeg 及其依赖对应源码。
 - `7z2602-src.7z`：未修改的 7-Zip 26.02 自解压模块对应源码。
 - `SHA256SUMS.txt`：下载文件校验值。
+
+`Shengnian-0.3.2-Windows-payload.001` 和 `.002` 是安装器自动读取的完整程序载荷，普通用户无需手动下载。安装需要连接 GitHub，并建议预留至少 10 GB 空间。
 
 可直接把这个发布页地址发给朋友：https://github.com/kingkk469/shengnian/releases/tag/v0.3.2-windows
