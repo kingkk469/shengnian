@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -120,6 +121,26 @@ internal sealed class OnlineInstaller : Form
         }
         string app = Path.Combine(destination, "声年", "声年.exe");
         if (!File.Exists(app) || Sha256(app) != AppHash) throw new IOException("解压后的声年程序校验未通过。");
+        File.WriteAllText(Path.Combine(destination, "声年", "请先读我.txt"),
+            "声年 Windows 免费版 0.3.2\r\n\r\n安装已完成，双击同目录中的声年.exe 即可使用。\r\n" +
+            "点击主界面的 API 配置，填写自己的 DeepSeek Key 并保存；重启后自动读取。\r\n" +
+            "录音与转写在本机运行，无需 API Key；AI 调用费用由自己的服务商账户承担。\r\n" +
+            "个人数据在 %LOCALAPPDATA%\\VoiceJournal\\Data。请勿转发其中的录音、转写或 API 密钥。\r\n" +
+            "保留整个声年文件夹，_internal 目录不可单独移走。程序未做代码签名。\r\n\r\n" +
+            "下载和完整对应源码：https://github.com/kingkk469/shengnian/releases/tag/v0.3.2-windows\r\n");
+    }
+
+    private static void CreateDesktopShortcut(string destination)
+    {
+        string link = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "声年免费版 0.3.2.lnk");
+        if (File.Exists(link)) return;
+        Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+        object shell = Activator.CreateInstance(shellType);
+        object shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] {link});
+        Type shortcutType = shortcut.GetType();
+        shortcutType.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] {Path.Combine(destination, "声年", "声年.exe")});
+        shortcutType.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] {Path.Combine(destination, "声年")});
+        shortcutType.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
     }
 
     private async Task DownloadAndInstall()
@@ -161,6 +182,7 @@ internal sealed class OnlineInstaller : Form
             install.Text = "打开声年";
             install.Enabled = true;
             installedApp = Path.Combine(destination, "声年", "声年.exe");
+            try { CreateDesktopShortcut(destination); } catch { /* App remains usable if desktop policy prevents shortcuts. */ }
             if (launch.Checked) Process.Start(new ProcessStartInfo(installedApp) {UseShellExecute = true});
         }
         catch (Exception error)
